@@ -5,19 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>檢查人員考核系統｜考生版</title>
 
-<!-- 固定讀取這兩個現有檔案（請保持同層、同檔名） -->
+<!-- 固定讀取現有根目錄檔案 -->
 <script src="people.data.js"></script>
 <script src="questions.data.js"></script>
 
 <style>
-:root{
-  --brand:#1d6dc9; --ink:#111827; --muted:#6b7280;
-  --bg:#f7fafc; --card:#fff; --bd:#e5e7eb;
-  --ok:#059669; --warn:#d97706; --err:#e11d48;
-}
+:root{ --brand:#1d6dc9; --ink:#111827; --muted:#6b7280; --bg:#f7fafc; --card:#fff; --bd:#e5e7eb; --ok:#059669; --warn:#d97706; --err:#e11d48; }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
 .container{max-width:980px;margin:auto;padding:20px}
 h1{margin:8px 0 12px;font-size:22px;letter-spacing:.5px;color:var(--brand);font-weight:900}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 8px 24px rgba(0,0,0,.04)}
@@ -37,9 +32,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .table th,.table td{border:1px solid var(--bd);padding:8px;text-align:left}
 .table th{background:#f3f8ff;color:#155a9e}
 .note{font-size:12px;color:var(--muted)}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
-  background:#111827;color:#fff;padding:10px 14px;border-radius:12px;
-  box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .25s}
 .toast.show{opacity:1}
 .hidden{display:none!important}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--bd);font-size:12px;color:#155a9e;background:#f3f8ff;margin-right:6px}
@@ -49,7 +42,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 <div class="container">
   <h1>檢查人員考核系統｜考生版</h1>
 
-  <!-- Start Card -->
+  <!-- Start -->
   <div id="startCard" class="card">
     <div class="row">
       <div class="col">
@@ -73,7 +66,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <button id="btnStart" disabled>開始作答</button>
   </div>
 
-  <!-- Exam Card -->
+  <!-- Exam -->
   <div id="examCard" class="card hidden" aria-live="polite">
     <div class="row">
       <div class="col"><div class="kv">考生：<b id="kvName">-</b></div></div>
@@ -83,13 +76,12 @@ button:disabled{opacity:.5;cursor:not-allowed}
         <div class="progress"><i id="progBar"></i></div>
       </div>
     </div>
-
     <div id="qList"></div>
     <div class="hr"></div>
     <button id="btnSubmit" disabled>送出答案</button>
   </div>
 
-  <!-- Result Card -->
+  <!-- Result -->
   <div id="resultCard" class="card hidden" aria-live="polite">
     <div class="row">
       <div class="col"><div class="kv">總分：<b id="scScore">-</b></div></div>
@@ -100,218 +92,102 @@ button:disabled{opacity:.5;cursor:not-allowed}
     <p class="note">系統已自動上傳成績至 Google 試算表，無需另外回報。</p>
   </div>
 </div>
-
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
-/* ===== 參數區（保持檔名位置不變） ===== */
+/* ===== 設定 ===== */
 const GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwXmceMbgiut0dCnVECBqRsePx80cdH2AQiM1DMr6YK8w2yS5faXzkaSIGaw3A23x-v-w/exec';
-const PASS_THRESHOLD = 90; // 及格率（%）
+const PASS_THRESHOLD = 90;
 
-/* ===== 簡易工具 ===== */
-const $ = sel => document.querySelector(sel);
-const $$ = sel => Array.from(document.querySelectorAll(sel));
-const toast = (msg) => {
-  const el = $('#toast'); el.textContent = msg; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'), 2000);
-};
-const shuffle = (arr) => arr.map(v=>[Math.random(),v]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+/* ===== 工具 ===== */
+const $ = s=>document.querySelector(s);
+const toast = (m)=>{const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);};
+const shuffle = a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
 
-/* ===== 1) 載入名單 ===== */
-const selPerson = $('#selPerson');
-const kvDept = $('#kvDept');
-const kvCats = $('#kvCats');
-const btnStart = $('#btnStart');
-const selCount = $('#selCount');
-
-const enabledPeople = (window.PEOPLE_DATA || []).filter(p => String(p.enabled) === '1' || p.enabled === 1);
-const sortByDeptName = (a,b)=> (a.dept||'').localeCompare(b.dept||'') || (a.name||'').localeCompare(b.name||'');
-
-enabledPeople.sort(sortByDeptName).forEach(p=>{
-  const opt = document.createElement('option');
-  opt.value = p.name; opt.textContent = `${p.dept}｜${p.name}`;
-  selPerson.appendChild(opt);
-});
-
-/* ===== 2) 當選到某人 → 顯示部門 + 類別徽章 ===== */
-let currentPerson = null;
-selPerson.addEventListener('change', ()=>{
-  const name = selPerson.value;
-  currentPerson = enabledPeople.find(p=>p.name===name) || null;
-  if(!currentPerson){
-    kvDept.textContent = '-';
-    kvCats.innerHTML = '';
-    btnStart.disabled = true;
-    return;
-  }
-  kvDept.textContent = currentPerson.dept || '-';
-  // 類別 A~F === 'Y'
-  const cats = ['A','B','C','D','E','F'].filter(k => String(currentPerson[k]||'')==='Y');
-  kvCats.innerHTML = cats.length ? cats.map(c=>`<span class="badge">類別 ${c}</span>`).join('') : '<span class="badge">未設定</span>';
+/* ===== 名單 ===== */
+const selPerson=$('#selPerson'), kvDept=$('#kvDept'), kvCats=$('#kvCats'), btnStart=$('#btnStart'), selCount=$('#selCount');
+const enabledPeople=(window.PEOPLE_DATA||[]).filter(p=>String(p.enabled)==='1'||p.enabled===1);
+enabledPeople.sort((a,b)=>(a.dept||'').localeCompare(b.dept||'')||(a.name||'').localeCompare(b.name||''))
+  .forEach(p=>{const o=document.createElement('option');o.value=p.name;o.textContent=`${p.dept}｜${p.name}`;selPerson.appendChild(o);});
+let currentPerson=null;
+selPerson.addEventListener('change',()=>{
+  currentPerson=enabledPeople.find(p=>p.name===selPerson.value)||null;
+  if(!currentPerson){kvDept.textContent='-';kvCats.innerHTML='';btnStart.disabled=true;return;}
+  kvDept.textContent=currentPerson.dept||'-';
+  const cats=['A','B','C','D','E','F'].filter(k=>String(currentPerson[k]||'')==='Y');
+  kvCats.innerHTML=cats.length?cats.map(c=>`<span class="badge">類別 ${c}</span>`).join(''):'<span class="badge">未設定</span>';
   btnStart.disabled = cats.length===0;
 });
 
-/* ===== 3) 平均出題（Round-Robin over 類別） ===== */
-const QUESTIONS = (window.QUESTIONS_DATA || []).slice(); // 保留原檔
-const byCat = {};
-QUESTIONS.forEach(q=>{
-  const cat = String(q['分類']||q['類別']||'').trim(); // 期待為 A~F
-  if(!byCat[cat]) byCat[cat]=[];
-  byCat[cat].push(q);
-});
+/* ===== 題庫整理 ===== */
+const QUESTIONS=(window.QUESTIONS_DATA||[]).slice();
+const byCat={}; QUESTIONS.forEach(q=>{const c=String(q['分類']||q['類別']||'').trim();(byCat[c]??=[]).push(q);});
 Object.keys(byCat).forEach(c=>byCat[c]=shuffle(byCat[c]));
 
-function buildPaper(cats, count){
-  // 將多個類別 round-robin 平均取題
-  const buckets = cats.map(c=> (byCat[c]||[]).slice()); // clone
-  const paper = [];
-  let idx = 0;
-  while(paper.length < count && buckets.some(b=>b.length)){
-    const b = buckets[idx % buckets.length];
-    if(b.length){
-      paper.push(b.shift());
-    }
-    idx++;
-  }
-  // 若不足（某些類別題目太少），用全庫補齊
-  if(paper.length < count){
-    const rest = shuffle(QUESTIONS.filter(q=>cats.includes(String(q['分類']||'').trim())));
-    for(const q of rest){
-      if(paper.length>=count) break;
-      if(!paper.includes(q)) paper.push(q);
-    }
-  }
-  // 編號
-  return paper.map((q,i)=>({ ...q, _no: i+1 }));
+/* ===== 出題/作答 ===== */
+const kvName=$('#kvName'), kvCount=$('#kvCount'), qList=$('#qList'), progBar=$('#progBar'), btnSubmit=$('#btnSubmit');
+const examCard=$('#examCard'), startCard=$('#startCard'), resultCard=$('#resultCard');
+
+let paper=[], answers={};
+function buildPaper(cats,count){
+  const buckets=cats.map(c=>(byCat[c]||[]).slice());
+  const out=[]; let i=0;
+  while(out.length<count && buckets.some(b=>b.length)){ const b=buckets[i%buckets.length]; if(b.length) out.push(b.shift()); i++; }
+  if(out.length<count){ const rest=shuffle(QUESTIONS.filter(q=>cats.includes(String(q['分類']||q['類別']||'').trim()))); for(const q of rest){ if(out.length>=count)break; if(!out.includes(q)) out.push(q);} }
+  return out.map((q,i)=>({...q,_no:i+1}));
 }
-
-/* ===== 4) 繪題 + 作答 ===== */
-const kvName = $('#kvName');
-const kvCount = $('#kvCount');
-const qList = $('#qList');
-const progBar = $('#progBar');
-const btnSubmit = $('#btnSubmit');
-const examCard = $('#examCard');
-const startCard = $('#startCard');
-const resultCard = $('#resultCard');
-
-let paper = [];
-let answers = {}; // key: q_{idx} -> '對' or '錯'
-
-function renderExam(){
-  qList.innerHTML = '';
-  answers = {};
-  paper.forEach((q,idx)=>{
-    const wrap = document.createElement('div');
-    wrap.className = 'question';
-    wrap.innerHTML = `
-      <div class="qtitle">Q${q._no}. ${q['題目']}</div>
-      <div class="radio">
-        <label><input type="radio" name="q_${idx}" value="對"> 對</label>
-        <label><input type="radio" name="q_${idx}" value="錯"> 錯</label>
-      </div>
-    `;
-    qList.appendChild(wrap);
-  });
+function renderExam(){ qList.innerHTML=''; answers={};
+  paper.forEach((q,idx)=>{ const w=document.createElement('div'); w.className='question';
+    w.innerHTML=`<div class="qtitle">Q${q._no}. ${q['題目']}</div>
+      <div class="radio"><label><input type="radio" name="q_${idx}" value="對"> 對</label>
+      <label><input type="radio" name="q_${idx}" value="錯"> 錯</label></div>`;
+    qList.appendChild(w);});
   updateProgress();
 }
+function updateProgress(){ const total=paper.length, answered=Object.keys(answers).length, rate=total?Math.round(answered/total*100):0; progBar.style.width=rate+'%'; btnSubmit.disabled=answered<total; }
+qList.addEventListener('change',e=>{const t=e.target; if(t&&t.name&&t.value){answers[t.name]=t.value; updateProgress();}});
 
-function updateProgress(){
-  const total = paper.length;
-  const answered = Object.keys(answers).length;
-  const rate = total? Math.round(answered/total*100) : 0;
-  progBar.style.width = rate + '%';
-  btnSubmit.disabled = answered < total;
-}
-
-qList.addEventListener('change', (e)=>{
-  const t = e.target;
-  if(t && t.name && t.value){
-    answers[t.name] = t.value;
-    updateProgress();
-  }
+btnStart.addEventListener('click',()=>{
+  const cats=['A','B','C','D','E','F'].filter(k=>String(currentPerson?.[k]||'')==='Y');
+  const count=parseInt(selCount.value,10)||10;
+  paper=buildPaper(cats,count);
+  kvName.textContent=currentPerson.name; kvCount.textContent=String(paper.length);
+  renderExam(); startCard.classList.add('hidden'); resultCard.classList.add('hidden'); examCard.classList.remove('hidden'); toast('題目已載入，請開始作答');
 });
 
-/* ===== 5) 開始作答 ===== */
-btnStart.addEventListener('click', ()=>{
-  const cats = ['A','B','C','D','E','F'].filter(k => String(currentPerson?.[k]||'')==='Y');
-  const count = parseInt(selCount.value,10) || 10;
-  paper = buildPaper(cats, count);
-  kvName.textContent = currentPerson.name;
-  kvCount.textContent = String(paper.length);
-  renderExam();
-  startCard.classList.add('hidden');
-  resultCard.classList.add('hidden');
-  examCard.classList.remove('hidden');
-  toast('題目已載入，請開始作答');
-});
+/* ===== 評分 & 上傳 ===== */
+const scScore=$('#scScore'), scRate=$('#scRate'), scPass=$('#scPass'), wrongBox=document.getElementById('wrongBox');
 
-/* ===== 6) 交卷 + 評分 + 上傳到 Google 試算表 ===== */
-const scScore = $('#scScore');
-const scRate  = $('#scRate');
-const scPass  = $('#scPass');
-const wrongBox = $('#wrongBox');
-
+function nowTWString(){ return new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:true}); }
 async function uploadGET(params){
-  // 以 GET 方式避免 CORS（GAS 請在 doGet 回傳 JSON）
-  const qs = new URLSearchParams(params);
-  qs.set('action','write');
-  qs.set('_t', Date.now());
-  const url = GAS_ENDPOINT + '?' + qs.toString();
-  try{
-    const r = await fetch(url, { method:'GET', cache:'no-store' });
-    // 若 GAS 設為公開，通常可取回文字；若 no-cors 則忽略
-    (await r.text()).slice(0,0); // 只觸發取讀，結果不強依賴
-    return true;
-  }catch(e){
-    console.error(e);
-    return false;
-  }
+  const qs=new URLSearchParams(params); qs.set('action','write'); qs.set('_t',Date.now());
+  const url=GAS_ENDPOINT+'?'+qs.toString();
+  try{ const r=await fetch(url,{method:'GET',cache:'no-store'}); await r.text(); return true; }catch(e){ console.error(e); return false; }
 }
 
 btnSubmit.addEventListener('click', async ()=>{
-  // 評分
   const total=paper.length; let correct=0, wrongs=[];
-  paper.forEach((q,idx)=>{
-    const a = answers['q_'+idx];
-    const ok = String(a)===String(q['答案']);
-    if(ok) correct++; else wrongs.push({ no:q._no, title:q['題目'], your:a, ans:q['答案'] });
-  });
-  const score = correct;
-  const rate  = Math.round(correct/total*100);
-  const pass  = rate>=PASS_THRESHOLD ? '通過' : '未通過';
-
-  // 畫面
-  scScore.textContent = `${score}/${total}`;
-  scRate.textContent  = `${rate}%`;
-  scPass.textContent  = pass;
-  wrongBox.innerHTML = wrongs.length
-    ? `<div class="hr"></div>
-       <div class="kv" style="margin-bottom:6px">錯題明細（${wrongs.length}）</div>
-       <table class="table">
-         <thead><tr><th>#</th><th>題目</th><th>你的答案</th><th>正確答案</th></tr></thead>
-         <tbody>${wrongs.map(w=>`<tr><td>${w.no}</td><td>${w.title}</td><td>${w.your||'-'}</td><td>${w.ans}</td></tr>`).join('')}</tbody>
-       </table>`
+  paper.forEach((q,idx)=>{const a=answers['q_'+idx]; const ok=String(a)===String(q['答案']); if(ok)correct++; else wrongs.push({no:q._no,title:q['題目'],your:a,ans:q['答案']});});
+  const score=correct, rate=Math.round(correct/total*100), pass=rate>=PASS_THRESHOLD?'通過':'未通過';
+  scScore.textContent=`${score}/${total}`; scRate.textContent=`${rate}%`; scPass.textContent=pass;
+  wrongBox.innerHTML = wrongs.length ? `<div class="hr"></div>
+    <div class="kv" style="margin-bottom:6px">錯題明細（${wrongs.length}）</div>
+    <table class="table"><thead><tr><th>#</th><th>題目</th><th>你的答案</th><th>正確答案</th></tr></thead>
+    <tbody>${wrongs.map(w=>`<tr><td>${w.no}</td><td>${w.title}</td><td>${w.your||'-'}</td><td>${w.ans}</td></tr>`).join('')}</tbody></table>`
     : `<div class="hr"></div><div class="kv">完美！全部答對 ✅</div>`;
+  examCard.classList.add('hidden'); resultCard.classList.remove('hidden');
 
-  examCard.classList.add('hidden');
-  resultCard.classList.remove('hidden');
-
-  // 整理上傳 payload（僅必要欄位）
-  const cats = ['A','B','C','D','E','F'].filter(k => String(currentPerson?.[k]||'')==='Y').join(',');
-  const payload = {
-    ts: new Date().toISOString(),
-    name: currentPerson?.name || '',
-    dept: currentPerson?.dept || '',
-    cats,
-    total,
-    score,
-    rate,
-    pass
+  // 這裡送出「時間戳記(台北) + UA」給 GAS；NO 由 GAS 自增
+  const cats=['A','B','C','D','E','F'].filter(k=>String(currentPerson?.[k]||'')==='Y').join(',');
+  const payload={
+    ts:new Date().toISOString(),       // ISO
+    tsTW: nowTWString(),               // 你要的「2025/11/4 上午 11:16:06」格式
+    name: currentPerson?.name||'',
+    total, score, pass, rate, cats,
+    ua: navigator.userAgent||''
   };
-
-  const ok = await uploadGET(payload);
-  toast(ok ? '成績已上傳' : '已送出（上傳未確認）');
+  const ok=await uploadGET(payload);
+  toast(ok?'成績已上傳':'已送出（上傳未確認）');
 });
 </script>
 </body>

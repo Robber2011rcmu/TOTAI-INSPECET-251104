@@ -96,8 +96,8 @@
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwXmceMbgiut0dCnVECBqRsePx80cdH2AQiM1DMr6YK8w2yS5faXzkaSIGaw3A23x-v-w/exec";
 
   // ===（２）可選：外部資料路徑（放在 repo 的 /data 資料夾）===
-  const URL_PEOPLE_JSON = "./data/people.json";           // 或 people.data.js (window.PEOPLE_DATA)
-  const URL_QUESTIONS_JS = "./data/questions.data.js";    // window.QUESTIONS_DATA（您已提供）
+  const URL_PEOPLE_JSON = null;                  // 先關閉 json 嘗試
+  const URL_QUESTIONS_JS = "./questions.data.js"; // 根目錄
 
   // --- 小工具（Toast） ---
   const Toast = (() => {
@@ -147,7 +147,7 @@
     // 再試 people.data.js（window.PEOPLE_DATA）
     try{
       await new Promise((resolve,reject)=>{
-        const s=document.createElement('script'); s.src='./data/people.data.js?ts='+Date.now();
+        const s=document.createElement('script'); s.src='./people.data.js?ts='+Date.now();
         s.onload=resolve; s.onerror=reject; document.head.appendChild(s);
       });
       if(Array.isArray(window.PEOPLE_DATA) && window.PEOPLE_DATA.length){ return {list:window.PEOPLE_DATA, src:'people.data.js'}; }
@@ -357,4 +357,3 @@
 </script>
 </body>
 </html>
-
